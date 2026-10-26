@@ -17,6 +17,10 @@ from .const import (
     CONF_API_KEY,
     CONF_AREAS,
     CONF_BASE_URL,
+    CONF_DISTANCE_MILES,
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    DEFAULT_DISTANCE_MILES,
     CONF_MONITOR_ALL,
     CONF_SCAN_INTERVAL_MINUTES,
     DEFAULT_BASE_URL,
@@ -194,12 +198,20 @@ class MetOfficeWarningsOptionsFlow(OptionsFlow):
                     if user_input[CONF_MONITOR_ALL]
                     else user_input[CONF_AREAS] or [AREA_ALL]
                 )
-                return self.async_create_entry(
-                    data={
+                lat = user_input.get(CONF_LATITUDE)
+                lon = user_input.get(CONF_LONGITUDE)
+                if (lat is None) != (lon is None):
+                    errors["base"] = "location_incomplete"
+                else:
+                    data = {
                         CONF_SCAN_INTERVAL_MINUTES: interval,
                         CONF_AREAS: areas,
+                        CONF_DISTANCE_MILES: user_input[CONF_DISTANCE_MILES],
                     }
-                )
+                    if lat is not None:
+                        data[CONF_LATITUDE] = lat
+                        data[CONF_LONGITUDE] = lon
+                    return self.async_create_entry(data=data)
 
         try:
             warnings = await _async_fetch_warnings(
@@ -216,6 +228,17 @@ class MetOfficeWarningsOptionsFlow(OptionsFlow):
             CONF_SCAN_INTERVAL_MINUTES, DEFAULT_SCAN_INTERVAL_MINUTES
         )
 
+        opts = self.config_entry.options
+        location_fields: dict = {}
+        for key, validator in (
+            (CONF_LATITUDE, cv.latitude),
+            (CONF_LONGITUDE, cv.longitude),
+        ):
+            # suggested_value (not default) so the user can clear the field.
+            location_fields[
+                vol.Optional(key, description={"suggested_value": opts.get(key)})
+            ] = validator
+
         schema = vol.Schema(
             {
                 vol.Required(
@@ -228,6 +251,11 @@ class MetOfficeWarningsOptionsFlow(OptionsFlow):
                     CONF_AREAS,
                     default=[a for a in current_areas if a != AREA_ALL],
                 ): cv.multi_select(region_choices),
+                **location_fields,
+                vol.Required(
+                    CONF_DISTANCE_MILES,
+                    default=opts.get(CONF_DISTANCE_MILES, DEFAULT_DISTANCE_MILES),
+                ): vol.All(vol.Coerce(float), vol.Range(min=0)),
             }
         )
 

@@ -40,6 +40,7 @@ class Warning:
     valid_to: datetime
     issued: datetime
     modified: datetime
+    polygons: tuple = ()
 
     def as_dict(self) -> dict:
         """Return a JSON-serialisable representation for entity attributes."""
@@ -61,6 +62,17 @@ class Warning:
 
 def _parse_datetime(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _polygons_from_geometry(geometry: dict | None) -> tuple:
+    if not geometry:
+        return ()
+    coords = geometry.get("coordinates") or []
+    if geometry.get("type") == "Polygon":
+        return (coords,)
+    if geometry.get("type") == "MultiPolygon":
+        return tuple(coords)
+    return ()
 
 
 def _warning_from_feature(feature: dict) -> Warning:
@@ -86,6 +98,7 @@ def _warning_from_feature(feature: dict) -> Warning:
         valid_to=_parse_datetime(props["validToDate"]),
         issued=_parse_datetime(props["issuedDate"]),
         modified=_parse_datetime(props["modifiedDate"]),
+        polygons=_polygons_from_geometry(feature.get("geometry")),
     )
 
 

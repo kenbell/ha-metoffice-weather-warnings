@@ -6,11 +6,12 @@ from datetime import datetime
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfLength
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import WARNING_LEVELS
-from .coordinator import MetOfficeWarningsCoordinator, top_warning
+from .const import CONF_LATITUDE, CONF_LONGITUDE, WARNING_LEVELS
+from .coordinator import MetOfficeWarningsCoordinator
 from .entity import MetOfficeWarningsEntity
 
 
@@ -21,15 +22,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up the warning sensors for this config entry."""
     coordinator: MetOfficeWarningsCoordinator = entry.runtime_data
-    async_add_entities(
-        [
+    entities: list[SensorEntity] = [
             MetOfficeWarningLevelSensor(coordinator, entry),
             MetOfficeWarningHeadlineSensor(coordinator, entry),
             MetOfficeWarningAreasSensor(coordinator, entry),
             MetOfficeWarningValidFromSensor(coordinator, entry),
             MetOfficeWarningValidToSensor(coordinator, entry),
-        ]
-    )
+    ]
+    latitude = entry.options.get(CONF_LATITUDE)
+    longitude = entry.options.get(CONF_LONGITUDE)
+    if latitude is not None and longitude is not None:
+        entities.append(MetOfficeWarningDistanceSensor(coordinator, entry))
+    async_add_entities(entities)
 
 
 class MetOfficeWarningLevelSensor(MetOfficeWarningsEntity, SensorEntity):
@@ -71,12 +75,12 @@ class MetOfficeWarningHeadlineSensor(MetOfficeWarningsEntity, SensorEntity):
 
     @property
     def native_value(self) -> str | None:
-        top = top_warning(self._data.warnings)
+        top = self._data.top
         return top.headline if top else None
 
     @property
     def extra_state_attributes(self) -> dict | None:
-        top = top_warning(self._data.warnings)
+        top = self._data.top
         if top is None:
             return None
         return {
@@ -103,7 +107,7 @@ class MetOfficeWarningAreasSensor(MetOfficeWarningsEntity, SensorEntity):
 
     @property
     def native_value(self) -> str | None:
-        top = top_warning(self._data.warnings)
+        top = self._data.top
         return ", ".join(top.region_names) if top else None
 
 
@@ -121,7 +125,7 @@ class MetOfficeWarningValidFromSensor(MetOfficeWarningsEntity, SensorEntity):
 
     @property
     def native_value(self) -> datetime | None:
-        top = top_warning(self._data.warnings)
+        top = self._data.top
         return top.valid_from if top else None
 
 
@@ -139,5 +143,23 @@ class MetOfficeWarningValidToSensor(MetOfficeWarningsEntity, SensorEntity):
 
     @property
     def native_value(self) -> datetime | None:
-        top = top_warning(self._data.warnings)
+        top = self._data.top
         return top.valid_to if top else None
+
+
+class MetOfficeWarningDistanceSensor(MetOfficeWarningsEntity, SensorEntity):
+    """Distance from the configured location to the top warning's region."""
+
+    _attr_name = "Warning distance"
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_native_unit_of_measurement = UnitOfLength.MILES
+
+    def __init__(
+        self, coordinator: MetOfficeWarningsCoordinator, entry: ConfigEntry
+    ) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_warning_distance"
+
+    @property
+    def native_value(self) -> float | None:
+        return self._data.top_distance_miles

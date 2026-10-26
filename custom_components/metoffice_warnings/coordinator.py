@@ -12,11 +12,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .api import NSWWSApiClient, NSWWSAuthError, NSWWSConnectionError
 from .const import (
     AREA_ALL,
+    DEFAULT_DISTANCE_MILES,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     WARNING_LEVEL_NONE,
     WARNING_LEVELS,
 )
+from .geo import distance_to_polygons_miles
 from .models import Warning
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,6 +55,8 @@ class WarningsData:
 
     warnings: list[Warning]
     level: str
+    top: Warning | None = None
+    top_distance_miles: float | None = None
 
 
 class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
@@ -64,6 +68,9 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
         client: NSWWSApiClient,
         areas: list[str],
         update_interval=DEFAULT_SCAN_INTERVAL,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        distance_miles: float = DEFAULT_DISTANCE_MILES,
     ) -> None:
         super().__init__(
             hass,
@@ -73,6 +80,9 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
         )
         self._client = client
         self._areas = areas
+        self._latitude = latitude
+        self._longitude = longitude
+        self._distance_miles = distance_miles
 
     async def _async_update_data(self) -> WarningsData:
         try:
@@ -85,4 +95,26 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
             raise UpdateFailed(f"Error fetching NSWWS warnings: {err}") from err
 
         matched = [w for w in all_warnings if _matches_area(w, self._areas)]
-        return WarningsData(warnings=matched, level=highest_level(matched))
+        top, top_distance = self._select_top(matched)
+        return WarningsData(
+            warnings=matched,
+            level=highest_level(matched),
+            top=top,
+            top_distance_miles=top_distance,
+        )
+
+    def _select_top(self, warnings: list[Warning]) -> tuple[Warning | None, float | None]:
+        """Pick the top warning, restricted to the configured radius if set.
+
+        Warnings arrive sorted by prominence, so the first one whose polygons
+        lie within the radius wins. Without a location, the first warning wins.
+        """
+        if self._latitude is None or self._longitude is None:
+            return top_warning(warnings), None
+        for warning in warnings:
+            distance = distance_to_polygons_miles(
+                warning.polygons, self._latitude, self._longitude
+            )
+            if distance is not None and distance <= self._distance_miles:
+                return warning, round(distance, 1)
+        return None, None

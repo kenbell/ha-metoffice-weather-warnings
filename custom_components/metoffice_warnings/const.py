@@ -43,3 +43,8 @@ WARNING_LEVELS: Final = (
     WARNING_LEVEL_AMBER,
     WARNING_LEVEL_RED,
 )
+
+CONF_LATITUDE: Final = "latitude"
+CONF_LONGITUDE: Final = "longitude"
+CONF_DISTANCE_MILES: Final = "distance_miles"
+DEFAULT_DISTANCE_MILES: Final = 20

@@ -41,11 +41,16 @@
         "data": {
           "scan_interval_minutes": "Poll interval (minutes)",
           "monitor_all": "Monitor all UK regions",
-          "areas": "Regions to monitor"
-        }
+          "areas": "Regions to monitor",
+          "latitude": "Latitude (optional)",
+          "longitude": "Longitude (optional)",
+          "distance_miles": "Distance from location (miles)"
+        },
+        "description": "Optionally set a location. When set, the top warning is chosen only from warnings whose area lies within the given distance of it, and a distance sensor is added."
       }
     },
     "error": {
+      "location_incomplete": "Provide both latitude and longitude, or neither.",
       "interval_too_short": "Poll interval must be at least 5 minutes."
     }
   }

@@ -94,6 +94,17 @@ Settings → Devices & Services → Add Integration → **Met Office Warnings**.
 Poll interval (default 10 minutes, minimum 5) and the area filter can be changed
 afterwards via the integration's options.
 
+### Optional location filter
+
+In the options you can also set a latitude/longitude and a distance (default 20
+miles). When a location is set, the "top" warning (used by the headline, areas,
+valid from/to sensors and the warning-active attributes) is the first warning,
+in the API's severity order, whose GeoJSON `MultiPolygon` lies within that distance
+of your location; warnings further away are ignored for this purpose. A
+`sensor.<name>_warning_distance` entity (miles) reports the distance from your
+location to that warning's region — `0` if you are inside it, `unknown` if no
+warning is in range. `warning_level` still reflects your area filter.
+
 ## How it works
 
 Each poll fetches the NSWWS `/objects/feed` Atom feed, follows its `rel="related"`

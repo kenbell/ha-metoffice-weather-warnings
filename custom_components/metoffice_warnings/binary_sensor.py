@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import WARNING_LEVEL_NONE
-from .coordinator import MetOfficeWarningsCoordinator, top_warning
+from .coordinator import MetOfficeWarningsCoordinator
 from .entity import MetOfficeWarningsEntity
 
 
@@ -43,7 +43,7 @@ class MetOfficeWarningActiveBinarySensor(MetOfficeWarningsEntity, BinarySensorEn
 
     @property
     def extra_state_attributes(self) -> dict | None:
-        top = top_warning(self._data.warnings)
+        top = self._data.top
         if top is None:
             return None
         return {
