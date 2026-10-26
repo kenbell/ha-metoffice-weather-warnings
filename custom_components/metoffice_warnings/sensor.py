@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfLength
 from homeassistant.core import HomeAssistant
@@ -151,8 +155,10 @@ class MetOfficeWarningDistanceSensor(MetOfficeWarningsEntity, SensorEntity):
     """Distance from the configured location to the top warning's region."""
 
     _attr_name = "Warning distance"
-    _attr_device_class = SensorDeviceClass.DISTANCE
+    # No DISTANCE device class: HA would convert the miles value to the user's
+    # unit system (e.g. km) and the distance filter is configured in miles.
     _attr_native_unit_of_measurement = UnitOfLength.MILES
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
         self, coordinator: MetOfficeWarningsCoordinator, entry: ConfigEntry
