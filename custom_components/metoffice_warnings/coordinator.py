@@ -95,26 +95,27 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
             raise UpdateFailed(f"Error fetching NSWWS warnings: {err}") from err
 
         matched = [w for w in all_warnings if _matches_area(w, self._areas)]
-        top, top_distance = self._select_top(matched)
-        return WarningsData(
-            warnings=matched,
-            level=highest_level(matched),
-            top=top,
-            top_distance_miles=top_distance,
-        )
-
-    def _select_top(self, warnings: list[Warning]) -> tuple[Warning | None, float | None]:
-        """Pick the top warning, restricted to the configured radius if set.
-
-        Warnings arrive sorted by prominence, so the first one whose polygons
-        lie within the radius wins. Without a location, the first warning wins.
-        """
         if self._latitude is None or self._longitude is None:
-            return top_warning(warnings), None
-        for warning in warnings:
+            return WarningsData(
+                warnings=matched,
+                level=highest_level(matched),
+                top=top_warning(matched),
+            )
+
+        # Keep only warnings whose region is within the configured distance.
+        # The API order (most prominent first) is preserved.
+        nearby: list[tuple[Warning, float]] = []
+        for warning in matched:
             distance = distance_to_polygons_miles(
                 warning.polygons, self._latitude, self._longitude
             )
             if distance is not None and distance <= self._distance_miles:
-                return warning, round(distance, 1)
-        return None, None
+                nearby.append((warning, distance))
+
+        warnings = [w for w, _ in nearby]
+        return WarningsData(
+            warnings=warnings,
+            level=highest_level(warnings),
+            top=warnings[0] if warnings else None,
+            top_distance_miles=round(nearby[0][1], 1) if nearby else None,
+        )

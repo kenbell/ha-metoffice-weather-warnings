@@ -97,13 +97,13 @@ afterwards via the integration's options.
 ### Optional location filter
 
 In the options you can also set a latitude/longitude and a distance (default 20
-miles). When a location is set, the "top" warning (used by the headline, areas,
-valid from/to sensors and the warning-active attributes) is the first warning,
-in the API's severity order, whose GeoJSON `MultiPolygon` lies within that distance
-of your location; warnings further away are ignored for this purpose. A
-`sensor.<name>_warning_distance` entity (miles) reports the distance from your
-location to that warning's region — `0` if you are inside it, `unknown` if no
-warning is in range. `warning_level` still reflects your area filter.
+miles). When a location is set, only warnings whose GeoJSON `MultiPolygon` lies
+within that distance of it are considered, so `warning_level`,
+`warning_active` and the warning list all ignore warnings further away. The "top"
+warning (headline, areas, valid from/to sensors) is the first remaining warning in
+the API's severity order. A `sensor.<name>_warning_distance` entity (miles) reports
+the distance from your location to that warning's region — `0` if you are inside
+it, `unknown` if no warning is in range.
 
 ## How it works
 

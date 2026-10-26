@@ -104,3 +104,22 @@ async def test_top_warning_respects_location(hass, issued_active) -> None:
     data = await far._async_update_data()
     assert data.top is None
     assert data.top_distance_miles is None
+
+
+async def test_location_filters_level_and_warnings(hass, issued_active) -> None:
+    client = AsyncMock()
+    client.async_get_active_warnings.return_value = warnings_from_geojson(issued_active)
+
+    far = MetOfficeWarningsCoordinator(
+        hass, client=client, areas=[AREA_ALL], latitude=57.0, longitude=-4.0
+    )
+    data = await far._async_update_data()
+    assert data.warnings == []
+    assert data.level == "none"
+
+    near = MetOfficeWarningsCoordinator(
+        hass, client=client, areas=[AREA_ALL], latitude=51.5, longitude=-0.1
+    )
+    data = await near._async_update_data()
+    assert data.warnings
+    assert data.level != "none"
