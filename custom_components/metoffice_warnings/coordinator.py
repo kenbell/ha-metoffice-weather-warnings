@@ -102,8 +102,9 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
                 top=top_warning(matched),
             )
 
-        # Keep only warnings whose region is within the configured distance.
-        # The API order (most prominent first) is preserved.
+        # Keep only warnings whose region is within the configured distance,
+        # ordered by severity then nearest first. The sort is stable, so the
+        # API's own ordering still breaks ties between equally distant ones.
         nearby: list[tuple[Warning, float]] = []
         for warning in matched:
             distance = distance_to_polygons_miles(
@@ -112,6 +113,7 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
             if distance is not None and distance <= self._distance_miles:
                 nearby.append((warning, distance))
 
+        nearby.sort(key=lambda item: (-_SEVERITY_RANK[item[0].level], item[1]))
         warnings = [w for w, _ in nearby]
         return WarningsData(
             warnings=warnings,

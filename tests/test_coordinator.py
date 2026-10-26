@@ -123,3 +123,28 @@ async def test_location_filters_level_and_warnings(hass, issued_active) -> None:
     data = await near._async_update_data()
     assert data.warnings
     assert data.level != "none"
+
+
+async def test_top_warning_is_nearest_of_equal_severity(hass, issued_active) -> None:
+    from dataclasses import replace
+
+    base = warnings_from_geojson(issued_active)[0]
+    square = lambda lon: (  # noqa: E731
+        [[[lon, 51.0], [lon, 52.0], [lon + 1, 52.0], [lon + 1, 51.0], [lon, 51.0]]],
+    )
+    far = replace(base, warning_id="far", polygons=square(5.0))
+    near = replace(base, warning_id="near", polygons=square(1.0))
+    client = AsyncMock()
+    client.async_get_active_warnings.return_value = [far, near]
+
+    coordinator = MetOfficeWarningsCoordinator(
+        hass,
+        client=client,
+        areas=[AREA_ALL],
+        latitude=51.5,
+        longitude=0.0,
+        distance_miles=500,
+    )
+    data = await coordinator._async_update_data()
+    assert data.top.warning_id == "near"
+    assert data.top_distance_miles < 100
