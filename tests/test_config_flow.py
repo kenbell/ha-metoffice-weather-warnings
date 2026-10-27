@@ -30,6 +30,11 @@ async def _start_user_step(hass):
     )
 
 
+async def _skip_location(hass, result):
+    assert result["step_id"] == "location"
+    return await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+
 async def test_user_step_success_no_active_warnings(hass, issued_empty) -> None:
     result = await _start_user_step(hass)
     assert result["type"] is FlowResultType.FORM
@@ -42,7 +47,8 @@ async def test_user_step_success_no_active_warnings(hass, issued_empty) -> None:
             {CONF_API_KEY: "test-key", CONF_BASE_URL: BASE_URL},
         )
 
-    # No live warnings to derive area choices from -> go straight to a completed entry.
+    # No live warnings to derive area choices from -> skip the area step.
+    result = await _skip_location(hass, result)
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_API_KEY] == "test-key"
     assert result["data"][CONF_AREAS] == [AREA_ALL]
@@ -65,6 +71,7 @@ async def test_user_step_then_area_selection(hass, issued_active) -> None:
         result["flow_id"],
         {CONF_MONITOR_ALL: False, CONF_AREAS: ["West Midlands"]},
     )
+    result = await _skip_location(hass, result)
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_AREAS] == ["West Midlands"]
@@ -84,6 +91,7 @@ async def test_area_step_monitor_all_ignores_selection(hass, issued_active) -> N
         result["flow_id"],
         {CONF_MONITOR_ALL: True, CONF_AREAS: []},
     )
+    result = await _skip_location(hass, result)
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_AREAS] == [AREA_ALL]
@@ -141,6 +149,7 @@ async def test_duplicate_entry_aborts(hass, issued_empty) -> None:
             result["flow_id"],
             {CONF_API_KEY: "dup-key", CONF_BASE_URL: BASE_URL},
         )
+        result = await _skip_location(hass, result)
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
     with aioresponses() as mocked:
@@ -162,6 +171,7 @@ async def test_options_flow_updates_scan_interval(hass, issued_empty) -> None:
             result["flow_id"],
             {CONF_API_KEY: "opt-key", CONF_BASE_URL: BASE_URL},
         )
+        await _skip_location(hass, result)
 
     entry = hass.config_entries.async_entries(DOMAIN)[0]
 
@@ -189,6 +199,7 @@ async def test_options_flow_interval_too_short(hass, issued_empty) -> None:
             result["flow_id"],
             {CONF_API_KEY: "short-key", CONF_BASE_URL: BASE_URL},
         )
+        await _skip_location(hass, result)
 
     entry = hass.config_entries.async_entries(DOMAIN)[0]
 
@@ -291,6 +302,7 @@ async def test_options_flow_fetch_failure_falls_back_to_empty_choices(
             result["flow_id"],
             {CONF_API_KEY: "fallback-key", CONF_BASE_URL: BASE_URL},
         )
+        await _skip_location(hass, result)
 
     entry = hass.config_entries.async_entries(DOMAIN)[0]
 
@@ -300,3 +312,76 @@ async def test_options_flow_fetch_failure_falls_back_to_empty_choices(
 
     assert options_result["type"] is FlowResultType.FORM
     assert options_result["step_id"] == "init"
+
+
+async def test_location_step_saves_options(hass, issued_empty) -> None:
+    result = await _start_user_step(hass)
+    with aioresponses() as mocked:
+        register_nswws(mocked, issued_empty)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "test-key", CONF_BASE_URL: BASE_URL},
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "location"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"latitude": 52.8, "longitude": -3.1, "distance_miles": 30},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_AREAS] == [AREA_ALL]
+    assert result["options"] == {
+        "latitude": 52.8,
+        "longitude": -3.1,
+        "distance_miles": 30,
+    }
+
+
+async def test_location_step_can_be_skipped(hass, issued_empty) -> None:
+    result = await _start_user_step(hass)
+    with aioresponses() as mocked:
+        register_nswws(mocked, issued_empty)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "test-key", CONF_BASE_URL: BASE_URL},
+        )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["options"] == {"distance_miles": 20}
+
+
+async def test_location_step_needs_both(hass, issued_empty) -> None:
+    result = await _start_user_step(hass)
+    with aioresponses() as mocked:
+        register_nswws(mocked, issued_empty)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "test-key", CONF_BASE_URL: BASE_URL},
+        )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"latitude": 52.8}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "location_incomplete"}
+
+
+async def test_location_step_follows_area_step(hass, issued_active) -> None:
+    result = await _start_user_step(hass)
+    with aioresponses() as mocked:
+        register_nswws(mocked, issued_active)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "test-key", CONF_BASE_URL: BASE_URL},
+        )
+    assert result["step_id"] == "areas"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_MONITOR_ALL: True}
+    )
+    assert result["step_id"] == "location"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"latitude": 52.8, "longitude": -3.1}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["options"]["latitude"] == 52.8

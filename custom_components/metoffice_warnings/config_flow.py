@@ -39,6 +39,16 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
+STEP_LOCATION_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_LATITUDE): cv.latitude,
+        vol.Optional(CONF_LONGITUDE): cv.longitude,
+        vol.Required(CONF_DISTANCE_MILES, default=DEFAULT_DISTANCE_MILES): vol.All(
+            vol.Coerce(float), vol.Range(min=0)
+        ),
+    }
+)
+
 
 async def _async_fetch_warnings(hass, api_key: str, base_url: str) -> list[Warning]:
     """Validate credentials and return the currently active warnings.
@@ -72,6 +82,7 @@ class MetOfficeWarningsConfigFlow(ConfigFlow, domain=DOMAIN):
         self._api_key: str | None = None
         self._base_url: str | None = None
         self._region_choices: dict[str, str] = {}
+        self._areas: list[str] = [AREA_ALL]
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -101,14 +112,7 @@ class MetOfficeWarningsConfigFlow(ConfigFlow, domain=DOMAIN):
                 if not self._region_choices:
                     # No warnings currently active anywhere - nothing to build an
                     # area picker from, so default to monitoring the whole UK.
-                    return self.async_create_entry(
-                        title="Met Office Warnings",
-                        data={
-                            CONF_API_KEY: self._api_key,
-                            CONF_BASE_URL: self._base_url,
-                            CONF_AREAS: [AREA_ALL],
-                        },
-                    )
+                    return await self.async_step_location()
                 return await self.async_step_areas()
 
         return self.async_show_form(
@@ -119,22 +123,48 @@ class MetOfficeWarningsConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
         if user_input is not None:
-            areas = (
+            self._areas = (
                 [AREA_ALL]
                 if user_input[CONF_MONITOR_ALL]
                 else user_input[CONF_AREAS] or [AREA_ALL]
             )
-            return self.async_create_entry(
-                title="Met Office Warnings",
-                data={
-                    CONF_API_KEY: self._api_key,
-                    CONF_BASE_URL: self._base_url,
-                    CONF_AREAS: areas,
-                },
-            )
+            return await self.async_step_location()
 
         return self.async_show_form(
             step_id="areas", data_schema=_areas_schema(self._region_choices)
+        )
+
+    async def async_step_location(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Optionally restrict warnings to those near a latitude/longitude."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            lat = user_input.get(CONF_LATITUDE)
+            lon = user_input.get(CONF_LONGITUDE)
+            if (lat is None) != (lon is None):
+                errors["base"] = "location_incomplete"
+            else:
+                options = {CONF_DISTANCE_MILES: user_input[CONF_DISTANCE_MILES]}
+                if lat is not None:
+                    options[CONF_LATITUDE] = lat
+                    options[CONF_LONGITUDE] = lon
+                return self.async_create_entry(
+                    title="Met Office Warnings",
+                    data={
+                        CONF_API_KEY: self._api_key,
+                        CONF_BASE_URL: self._base_url,
+                        CONF_AREAS: self._areas,
+                    },
+                    options=options,
+                )
+
+        schema = STEP_LOCATION_DATA_SCHEMA
+        if user_input is not None:
+            schema = self.add_suggested_values_to_schema(schema, user_input)
+        return self.async_show_form(
+            step_id="location", data_schema=schema, errors=errors
         )
 
     async def async_step_reauth(

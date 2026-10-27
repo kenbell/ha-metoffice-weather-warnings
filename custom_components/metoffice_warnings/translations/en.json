@@ -17,6 +17,15 @@
           "areas": "Regions to monitor"
         }
       },
+      "location": {
+        "title": "Limit warnings to a location (optional)",
+        "description": "Enter a latitude and longitude to only consider warnings whose area lies within the given distance of that location. Leave latitude and longitude empty to use all warnings matching your areas.",
+        "data": {
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "distance_miles": "Distance from location (miles)"
+        }
+      },
       "reauth_confirm": {
         "title": "Reconnect to the Met Office NSWWS API",
         "description": "Met Office rejected the current API key. Enter a new one to reconnect this integration.",
@@ -26,6 +35,7 @@
       }
     },
     "error": {
+      "location_incomplete": "Provide both latitude and longitude, or neither.",
       "invalid_auth": "Met Office rejected the API key. Double-check it and try again.",
       "cannot_connect": "Could not reach the Met Office NSWWS API.",
       "unknown": "Unexpected error while validating your credentials."

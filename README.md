@@ -88,15 +88,18 @@ Settings → Devices & Services → Add Integration → **Met Office Warnings**.
 2. If any warnings are currently active anywhere in the UK, you'll be offered a list
    of regions to filter to — leave **Monitor all UK regions** checked to track
    everything nationwide, or pick specific regions. If nothing is active right now,
-   setup completes immediately monitoring the whole UK; refine the area filter later
+   this step is skipped and the whole UK is monitored; refine the area filter later
    from the integration's **Configure** options.
+3. Optionally enter a latitude, longitude and distance to only consider warnings near
+   a location (see below), or leave them empty.
 
 Poll interval (default 10 minutes, minimum 5) and the area filter can be changed
 afterwards via the integration's options.
 
 ### Optional location filter
 
-In the options you can also set a latitude/longitude and a distance (default 20
+On first setup (a separate **location** step after the area choice) and later via the
+options, you can set an optional latitude/longitude and a distance (default 20
 miles). When a location is set, only warnings whose GeoJSON `MultiPolygon` lies
 within that distance of it are considered, so `warning_level`,
 `warning_active` and the warning list all ignore warnings further away. The "top"
