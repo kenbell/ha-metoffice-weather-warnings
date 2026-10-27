@@ -32,6 +32,8 @@ async def _start_user_step(hass):
 
 async def _skip_location(hass, result):
     assert result["step_id"] == "location"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["step_id"] == "weather_types"
     return await hass.config_entries.flow.async_configure(result["flow_id"], {})
 
 
@@ -329,6 +331,7 @@ async def test_location_step_saves_options(hass, issued_empty) -> None:
         result["flow_id"],
         {"latitude": 52.8, "longitude": -3.1, "distance_miles": 30},
     )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_AREAS] == [AREA_ALL]
     assert result["options"] == {
@@ -346,6 +349,7 @@ async def test_location_step_can_be_skipped(hass, issued_empty) -> None:
             result["flow_id"],
             {CONF_API_KEY: "test-key", CONF_BASE_URL: BASE_URL},
         )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -383,5 +387,49 @@ async def test_location_step_follows_area_step(hass, issued_active) -> None:
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"latitude": 52.8, "longitude": -3.1}
     )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["options"]["latitude"] == 52.8
+
+
+async def test_weather_types_step_saves_selection(hass, issued_empty) -> None:
+    result = await _start_user_step(hass)
+    with aioresponses() as mocked:
+        register_nswws(mocked, issued_empty)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "test-key", CONF_BASE_URL: BASE_URL},
+        )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["step_id"] == "weather_types"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"weather_types": ["WIND", "FOG"]}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["options"]["weather_types"] == ["WIND", "FOG"]
+
+
+async def test_options_flow_saves_weather_types(hass, issued_empty) -> None:
+    with aioresponses() as mocked:
+        register_nswws(mocked, issued_empty)
+        result = await _start_user_step(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "wt-key", CONF_BASE_URL: BASE_URL},
+        )
+        await _skip_location(hass, result)
+
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    with aioresponses() as mocked:
+        register_nswws(mocked, issued_empty)
+        options_result = await hass.config_entries.options.async_init(entry.entry_id)
+        options_result = await hass.config_entries.options.async_configure(
+            options_result["flow_id"],
+            {
+                CONF_SCAN_INTERVAL_MINUTES: 15,
+                CONF_MONITOR_ALL: True,
+                "distance_miles": 20,
+                "weather_types": ["SNOW"],
+            },
+        )
+    assert options_result["data"]["weather_types"] == ["SNOW"]

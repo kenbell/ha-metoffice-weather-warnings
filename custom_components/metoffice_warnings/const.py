@@ -48,3 +48,17 @@ CONF_LATITUDE: Final = "latitude"
 CONF_LONGITUDE: Final = "longitude"
 CONF_DISTANCE_MILES: Final = "distance_miles"
 DEFAULT_DISTANCE_MILES: Final = 20
+
+CONF_WEATHER_TYPES: Final = "weather_types"
+
+# Documented NSWWS weather types. An empty selection means "all types".
+WEATHER_TYPES: Final = (
+    "RAIN",
+    "THUNDERSTORM",
+    "WIND",
+    "SNOW",
+    "LIGHTNING",
+    "ICE",
+    "EXTREME HEAT",
+    "FOG",
+)

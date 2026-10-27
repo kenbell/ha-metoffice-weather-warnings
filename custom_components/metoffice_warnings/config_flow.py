@@ -20,6 +20,7 @@ from .const import (
     CONF_DISTANCE_MILES,
     CONF_LATITUDE,
     CONF_LONGITUDE,
+    CONF_WEATHER_TYPES,
     DEFAULT_DISTANCE_MILES,
     CONF_MONITOR_ALL,
     CONF_SCAN_INTERVAL_MINUTES,
@@ -27,6 +28,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
     MIN_SCAN_INTERVAL_MINUTES,
+    WEATHER_TYPES,
 )
 from .models import Warning
 
@@ -45,6 +47,16 @@ STEP_LOCATION_DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_LONGITUDE): cv.longitude,
         vol.Required(CONF_DISTANCE_MILES, default=DEFAULT_DISTANCE_MILES): vol.All(
             vol.Coerce(float), vol.Range(min=0)
+        ),
+    }
+)
+
+WEATHER_TYPE_CHOICES = {t: t.capitalize() for t in WEATHER_TYPES}
+
+STEP_WEATHER_TYPES_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_WEATHER_TYPES, default=[]): cv.multi_select(
+            WEATHER_TYPE_CHOICES
         ),
     }
 )
@@ -83,6 +95,7 @@ class MetOfficeWarningsConfigFlow(ConfigFlow, domain=DOMAIN):
         self._base_url: str | None = None
         self._region_choices: dict[str, str] = {}
         self._areas: list[str] = [AREA_ALL]
+        self._options: dict[str, Any] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -146,25 +159,39 @@ class MetOfficeWarningsConfigFlow(ConfigFlow, domain=DOMAIN):
             if (lat is None) != (lon is None):
                 errors["base"] = "location_incomplete"
             else:
-                options = {CONF_DISTANCE_MILES: user_input[CONF_DISTANCE_MILES]}
+                self._options = {CONF_DISTANCE_MILES: user_input[CONF_DISTANCE_MILES]}
                 if lat is not None:
-                    options[CONF_LATITUDE] = lat
-                    options[CONF_LONGITUDE] = lon
-                return self.async_create_entry(
-                    title="Met Office Warnings",
-                    data={
-                        CONF_API_KEY: self._api_key,
-                        CONF_BASE_URL: self._base_url,
-                        CONF_AREAS: self._areas,
-                    },
-                    options=options,
-                )
+                    self._options[CONF_LATITUDE] = lat
+                    self._options[CONF_LONGITUDE] = lon
+                return await self.async_step_weather_types()
 
         schema = STEP_LOCATION_DATA_SCHEMA
         if user_input is not None:
             schema = self.add_suggested_values_to_schema(schema, user_input)
         return self.async_show_form(
             step_id="location", data_schema=schema, errors=errors
+        )
+
+    async def async_step_weather_types(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Optionally restrict warnings to selected weather types."""
+        if user_input is not None:
+            weather_types = user_input.get(CONF_WEATHER_TYPES, [])
+            if weather_types:
+                self._options[CONF_WEATHER_TYPES] = weather_types
+            return self.async_create_entry(
+                title="Met Office Warnings",
+                data={
+                    CONF_API_KEY: self._api_key,
+                    CONF_BASE_URL: self._base_url,
+                    CONF_AREAS: self._areas,
+                },
+                options=self._options,
+            )
+
+        return self.async_show_form(
+            step_id="weather_types", data_schema=STEP_WEATHER_TYPES_DATA_SCHEMA
         )
 
     async def async_step_reauth(
@@ -241,6 +268,8 @@ class MetOfficeWarningsOptionsFlow(OptionsFlow):
                     if lat is not None:
                         data[CONF_LATITUDE] = lat
                         data[CONF_LONGITUDE] = lon
+                    if user_input.get(CONF_WEATHER_TYPES):
+                        data[CONF_WEATHER_TYPES] = user_input[CONF_WEATHER_TYPES]
                     return self.async_create_entry(data=data)
 
         try:
@@ -286,6 +315,10 @@ class MetOfficeWarningsOptionsFlow(OptionsFlow):
                     CONF_DISTANCE_MILES,
                     default=opts.get(CONF_DISTANCE_MILES, DEFAULT_DISTANCE_MILES),
                 ): vol.All(vol.Coerce(float), vol.Range(min=0)),
+                vol.Optional(
+                    CONF_WEATHER_TYPES,
+                    default=opts.get(CONF_WEATHER_TYPES, []),
+                ): cv.multi_select(WEATHER_TYPE_CHOICES),
             }
         )
 

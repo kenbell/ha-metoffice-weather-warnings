@@ -26,6 +26,13 @@
           "distance_miles": "Distance from location (miles)"
         }
       },
+      "weather_types": {
+        "title": "Limit warnings to weather types (optional)",
+        "description": "Select the weather types to monitor. Leave empty to monitor all types.",
+        "data": {
+          "weather_types": "Weather types"
+        }
+      },
       "reauth_confirm": {
         "title": "Reconnect to the Met Office NSWWS API",
         "description": "Met Office rejected the current API key. Enter a new one to reconnect this integration.",
@@ -54,7 +61,8 @@
           "areas": "Regions to monitor",
           "latitude": "Latitude (optional)",
           "longitude": "Longitude (optional)",
-          "distance_miles": "Distance from location (miles)"
+          "distance_miles": "Distance from location (miles)",
+          "weather_types": "Weather types (empty = all)"
         },
         "description": "Optionally set a location. When set, the top warning is chosen only from warnings whose area lies within the given distance of it, and a distance sensor is added."
       }

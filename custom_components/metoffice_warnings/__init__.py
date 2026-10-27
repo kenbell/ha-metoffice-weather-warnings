@@ -17,6 +17,7 @@ from .const import (
     CONF_DISTANCE_MILES,
     CONF_LATITUDE,
     CONF_LONGITUDE,
+    CONF_WEATHER_TYPES,
     DEFAULT_DISTANCE_MILES,
     CONF_SCAN_INTERVAL_MINUTES,
     DEFAULT_SCAN_INTERVAL_MINUTES,
@@ -44,6 +45,7 @@ async def async_setup_entry(
     latitude = entry.options.get(CONF_LATITUDE)
     longitude = entry.options.get(CONF_LONGITUDE)
     distance_miles = entry.options.get(CONF_DISTANCE_MILES, DEFAULT_DISTANCE_MILES)
+    weather_types = entry.options.get(CONF_WEATHER_TYPES, [])
 
     coordinator = MetOfficeWarningsCoordinator(
         hass,
@@ -53,6 +55,7 @@ async def async_setup_entry(
         latitude=latitude,
         longitude=longitude,
         distance_miles=distance_miles,
+        weather_types=weather_types,
     )
     try:
         await coordinator.async_config_entry_first_refresh()

@@ -43,6 +43,18 @@ def top_warning(warnings: list[Warning]) -> Warning | None:
     return warnings[0] if warnings else None
 
 
+def _normalise_weather_type(value: str) -> str:
+    return value.strip().upper().replace("_", " ")
+
+
+def _matches_weather_type(warning: Warning, weather_types: list[str]) -> bool:
+    """True if no weather types are selected, or the warning has a selected one."""
+    if not weather_types:
+        return True
+    wanted = {_normalise_weather_type(t) for t in weather_types}
+    return any(_normalise_weather_type(t) in wanted for t in warning.weather_types)
+
+
 def _matches_area(warning: Warning, areas: list[str]) -> bool:
     if AREA_ALL in areas:
         return True
@@ -71,6 +83,7 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
         latitude: float | None = None,
         longitude: float | None = None,
         distance_miles: float = DEFAULT_DISTANCE_MILES,
+        weather_types: list[str] | None = None,
     ) -> None:
         super().__init__(
             hass,
@@ -83,6 +96,7 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
         self._latitude = latitude
         self._longitude = longitude
         self._distance_miles = distance_miles
+        self._weather_types = weather_types or []
 
     async def _async_update_data(self) -> WarningsData:
         try:
@@ -94,7 +108,12 @@ class MetOfficeWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
         except NSWWSConnectionError as err:
             raise UpdateFailed(f"Error fetching NSWWS warnings: {err}") from err
 
-        matched = [w for w in all_warnings if _matches_area(w, self._areas)]
+        matched = [
+            w
+            for w in all_warnings
+            if _matches_area(w, self._areas)
+            and _matches_weather_type(w, self._weather_types)
+        ]
         if self._latitude is None or self._longitude is None:
             return WarningsData(
                 warnings=matched,

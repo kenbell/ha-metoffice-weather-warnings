@@ -148,3 +148,24 @@ async def test_top_warning_is_nearest_of_equal_severity(hass, issued_active) -> 
     data = await coordinator._async_update_data()
     assert data.top.warning_id == "near"
     assert data.top_distance_miles < 100
+
+
+async def test_weather_type_filter(hass, issued_active) -> None:
+    client = AsyncMock()
+    client.async_get_active_warnings.return_value = warnings_from_geojson(issued_active)
+
+    wind = MetOfficeWarningsCoordinator(
+        hass, client=client, areas=[AREA_ALL], weather_types=["WIND"]
+    )
+    data = await wind._async_update_data()
+    assert [w.weather_types for w in data.warnings] == [["WIND"]]
+
+    snow = MetOfficeWarningsCoordinator(
+        hass, client=client, areas=[AREA_ALL], weather_types=["SNOW"]
+    )
+    data = await snow._async_update_data()
+    assert data.warnings == []
+    assert data.level == "none"
+
+    everything = MetOfficeWarningsCoordinator(hass, client=client, areas=[AREA_ALL])
+    assert len((await everything._async_update_data()).warnings) == 2

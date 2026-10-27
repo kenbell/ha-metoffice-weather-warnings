@@ -92,6 +92,7 @@ Settings → Devices & Services → Add Integration → **Met Office Warnings**.
    from the integration's **Configure** options.
 3. Optionally enter a latitude, longitude and distance to only consider warnings near
    a location (see below), or leave them empty.
+4. Optionally select weather types to monitor (see below), or leave it empty.
 
 Poll interval (default 10 minutes, minimum 5) and the area filter can be changed
 afterwards via the integration's options.
@@ -107,6 +108,14 @@ warning (headline, areas, valid from/to sensors) is the most severe remaining
 warning, with the nearest one winning between warnings of the same level. A `sensor.<name>_warning_distance` entity (miles) reports
 the distance from your location to that warning's region — `0` if you are inside
 it, `unknown` if no warning is in range.
+
+### Optional weather type filter
+
+You can restrict warnings to a subset of the documented weather types: rain,
+thunderstorm, wind, snow, lightning, ice, extreme heat and fog. A warning is kept if
+it includes at least one selected type. Leave the selection empty to monitor all
+types. It is offered as the last setup step and in the integration's options, and
+applies to all entities, together with the area and location filters.
 
 ## How it works
 
